@@ -1,34 +1,83 @@
+import { useState, useEffect } from 'react';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { patients, doctors, nurses, appointments, departments, billingRecords } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Patient, Doctor, Nurse, Appointment, Department, BillingRecord } from '../../types';
 
 export default function AdminDashboard() {
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [nurses, setNurses] = useState<Nurse[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [
+          patientsData,
+          doctorsData,
+          nursesData,
+          appointmentsData,
+          departmentsData,
+          billingData
+        ] = await Promise.all([
+          api.fetchPatients(),
+          api.fetchDoctors(),
+          api.fetchNurses(),
+          api.fetchAppointments(),
+          api.fetchDepartments(),
+          api.fetchBilling()
+        ]);
+        
+        setPatients(patientsData);
+        setDoctors(doctorsData);
+        setNurses(nursesData);
+        setAppointments(appointmentsData);
+        setDepartments(departmentsData);
+        setBillingRecords(billingData);
+      } catch (error) {
+        console.error("Error fetching data from Django backend:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading data from Django Backend...</p></div>;
+  }
+
   const totalRevenue = billingRecords.reduce((sum, b) => sum + b.totalAmount, 0);
   const occupiedBeds = departments.reduce((sum, d) => sum + d.bedsOccupied, 0);
-  const totalBeds = departments.reduce((sum, d) => sum + d.bedsTotal, 0);
-  const todayAppointments = appointments.filter(a => a.date === '2026-01-28');
+  const totalBeds = departments.reduce((sum, d) => sum + d.bedsTotal, 0) || 1; // avoid div by 0
+  const today = new Date().toISOString().split('T')[0];
+  const todayAppointments = appointments.filter(a => a.date === today);
   const criticalPatients = patients.filter(p => p.status === 'Critical');
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-800">Administrator Dashboard</h2>
-        <p className="text-gray-500 mt-1">Hospital overview and key metrics</p>
+        <p className="text-gray-500 mt-1">Hospital overview and key metrics (Connected to Django Backend)</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Patients" value={patients.length} icon="🏥" change="+3 this week" changeType="positive" />
-        <StatCard title="Active Doctors" value={doctors.filter(d => d.status !== 'On Leave').length} icon="👨‍⚕️" change={`${doctors.length} total`} changeType="neutral" />
-        <StatCard title="Nurses on Duty" value={nurses.filter(n => n.status === 'On Duty').length} icon="👩‍⚕️" change={`${nurses.length} total`} changeType="neutral" />
-        <StatCard title="Bed Occupancy" value={`${Math.round((occupiedBeds / totalBeds) * 100)}%`} icon="🛏️" change={`${occupiedBeds}/${totalBeds} beds`} changeType={occupiedBeds / totalBeds > 0.8 ? 'negative' : 'positive'} />
+        <StatCard title="Total Patients" value={patients.length} icon="🏥" change="+3 this week" changeType="positive" href="/administrator/patients" />
+        <StatCard title="Active Doctors" value={doctors.filter(d => d.status !== 'On Leave').length} icon="👨‍⚕️" change={`${doctors.length} total`} changeType="neutral" href="/administrator/doctors" />
+        <StatCard title="Nurses on Duty" value={nurses.filter(n => n.status === 'On Duty').length} icon="👩‍⚕️" change={`${nurses.length} total`} changeType="neutral" href="/administrator/nurses" />
+        <StatCard title="Bed Occupancy" value={`${Math.round((occupiedBeds / totalBeds) * 100)}%`} icon="🛏️" change={`${occupiedBeds}/${totalBeds} beds`} changeType={occupiedBeds / totalBeds > 0.8 ? 'negative' : 'positive'} href="/administrator/departments" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Today's Appointments" value={todayAppointments.length} icon="📅" change="2 completed" changeType="positive" />
-        <StatCard title="Critical Patients" value={criticalPatients.length} icon="🚨" change="Needs attention" changeType="negative" />
-        <StatCard title="Total Revenue" value={`$${(totalRevenue / 1000).toFixed(0)}K`} icon="💰" change="+12% this month" changeType="positive" />
-        <StatCard title="Departments" value={departments.length} icon="🏢" change="All operational" changeType="positive" />
+        <StatCard title="Today's Appointments" value={todayAppointments.length} icon="📅" change="2 completed" changeType="positive" href="/administrator/appointments" />
+        <StatCard title="Critical Patients" value={criticalPatients.length} icon="🚨" change="Needs attention" changeType="negative" href="/administrator/patients" />
+        <StatCard title="Total Revenue" value={`Ksh ${(totalRevenue / 1000).toFixed(0)}K`} icon="💰" change="+12% this month" changeType="positive" href="/administrator/billing" />
+        <StatCard title="Departments" value={departments.length} icon="🏢" change="All operational" changeType="positive" href="/administrator/departments" />
       </div>
 
       {/* Main Content Grid */}
@@ -58,6 +107,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+            {todayAppointments.length === 0 && (
+              <div className="p-4 text-center text-gray-400">No appointments today</div>
+            )}
           </div>
         </div>
 
@@ -130,7 +182,7 @@ export default function AdminDashboard() {
                   <p className="text-xs text-gray-500">{bill.date}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-gray-800">${bill.totalAmount.toLocaleString()}</p>
+                  <p className="font-semibold text-gray-800">Ksh {bill.totalAmount.toLocaleString()}</p>
                   <StatusBadge status={bill.status} />
                 </div>
               </div>

@@ -1,13 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import { useAuth } from '../../context/AuthContext';
-import { prescriptions } from '../../data/mockData';
+import * as api from '../../utils/api';
 import { Prescription } from '../../types';
 
 export default function PatientPrescriptions() {
   const { user } = useAuth();
-  const myPrescriptions = prescriptions.filter(p => p.patientId === user?.id);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPresc, setSelectedPresc] = useState<Prescription | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await api.fetchPrescriptions();
+        setPrescriptions(data);
+      } catch (err) {
+        console.error('Error fetching prescriptions:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Prescriptions...</p></div>;
+  }
+
+  const myPrescriptions = prescriptions.filter(p => p.patientId === user?.id);
 
   return (
     <div className="space-y-6">

@@ -1,10 +1,34 @@
+import { useState, useEffect } from 'react';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
-import { appointments } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Appointment } from '../../types';
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await api.fetchAppointments();
+        setAppointments(data);
+      } catch (err) {
+        console.error('Error fetching schedule:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Schedule...</p></div>;
+  }
+
   const myAppointments = appointments.filter(a => a.doctorId === user?.id);
+  const today = new Date().toISOString().split('T')[0];
 
   const groupedByDate = myAppointments.reduce((acc, apt) => {
     if (!acc[apt.date]) acc[apt.date] = [];
@@ -57,6 +81,9 @@ export default function DoctorSchedule() {
                 </div>
               </div>
             ))}
+            {sortedDates.length === 0 && (
+              <div className="col-span-3 p-8 text-center text-gray-400">No appointments scheduled</div>
+            )}
           </div>
         </div>
       </div>
@@ -64,12 +91,12 @@ export default function DoctorSchedule() {
       {/* Available Slots */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-800">Available Time Slots (Jan 28)</h3>
+          <h3 className="font-semibold text-gray-800">Available Time Slots (Today — {today})</h3>
         </div>
         <div className="p-4">
           <div className="flex flex-wrap gap-2">
             {timeSlots.map(slot => {
-              const isBooked = myAppointments.some(a => a.date === '2026-01-28' && a.time === slot);
+              const isBooked = myAppointments.some(a => a.date === today && a.time === slot);
               return (
                 <div key={slot} className={`px-4 py-2 rounded-lg text-sm font-medium border ${
                   isBooked

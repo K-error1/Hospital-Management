@@ -1,9 +1,34 @@
+import { useState, useEffect } from 'react';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
-import { patients, prescriptions } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Patient, Prescription } from '../../types';
 
 export default function NurseMedications() {
   const { user } = useAuth();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [pData, prData] = await Promise.all([api.fetchPatients(), api.fetchPrescriptions()]);
+        setPatients(pData);
+        setPrescriptions(prData);
+      } catch (err) {
+        console.error('Error fetching medication data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Medications...</p></div>;
+  }
+
   const myPatients = patients.filter(p => p.assignedNurse === user?.id);
 
   const medicationSchedule = myPatients.flatMap(patient => {
@@ -15,7 +40,7 @@ export default function NurseMedications() {
         medication: med.name,
         dosage: med.dosage,
         frequency: med.frequency,
-        status: Math.random() > 0.5 ? 'Administered' : 'Pending' as string,
+        status: 'Pending' as string,
       }))
     );
   });
@@ -77,6 +102,11 @@ export default function NurseMedications() {
                   </td>
                 </tr>
               ))}
+              {medicationSchedule.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No medications found for your patients</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -1,15 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import { useAuth } from '../../context/AuthContext';
-import { vitalSigns, patients } from '../../data/mockData';
-import { VitalSign } from '../../types';
+import * as api from '../../utils/api';
+import { VitalSign, Patient } from '../../types';
 
 export default function NurseVitals() {
   const { user } = useAuth();
+  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [vData, pData] = await Promise.all([api.fetchVitals(), api.fetchPatients()]);
+        setVitalSigns(vData);
+        setPatients(pData);
+      } catch (err) {
+        console.error('Error fetching vitals data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Vitals...</p></div>;
+  }
+
   const myVitals = vitalSigns.filter(v => v.nurseId === user?.id);
   const myPatients = patients.filter(p => p.assignedNurse === user?.id);
-  const [showForm, setShowForm] = useState(false);
 
   const columns = [
     { key: 'time', label: 'Time', render: (v: VitalSign) => <span className="font-semibold text-sky-700">{v.time}</span> },
@@ -27,9 +50,9 @@ export default function NurseVitals() {
     },
     {
       key: 'temperature',
-      label: 'Temp (°F)',
+      label: 'Temp (°C)',
       render: (v: VitalSign) => (
-        <span className={`font-semibold ${v.temperature > 99 ? 'text-red-600' : 'text-gray-800'}`}>{v.temperature}</span>
+        <span className={`font-semibold ${v.temperature > 37.2 ? 'text-red-600' : 'text-gray-800'}`}>{v.temperature}</span>
       ),
     },
     { key: 'bloodPressure', label: 'BP' },
@@ -66,13 +89,43 @@ export default function NurseVitals() {
         </button>
       </div>
 
-      <DataTable columns={columns} data={myVitals} title="Today's Vital Records" searchKeys={['patientName']} />
+      <DataTable columns={columns} data={myVitals} title="My Vital Records" searchKeys={['patientName']} />
 
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Record Vital Signs" size="lg">
-        <form className="space-y-4">
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          const form = e.target as any;
+          const patientId = form[0].value;
+          const patient = patients.find(p => p.id === patientId);
+          if(!patient) return;
+          
+          const newVitals = {
+            id: `VIT-${Date.now()}`,
+            patientId: patient.id,
+            patientName: patient.name,
+            nurseId: user?.id,
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toLocaleTimeString().slice(0,5),
+            temperature: parseFloat(form[1].value),
+            bloodPressure: form[2].value,
+            heartRate: parseInt(form[3].value),
+            oxygenLevel: parseInt(form[4].value),
+            weight: parseFloat(form[5].value),
+            notes: form[6].value
+          };
+          try {
+            await api.post('vitals', newVitals);
+            setShowForm(false);
+            const [vData, pData] = await Promise.all([api.fetchVitals(), api.fetchPatients()]);
+            setVitalSigns(vData);
+            setPatients(pData);
+          } catch(err) {
+            alert('Failed to record vitals');
+          }
+        }} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+            <select required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
               <option value="">Select Patient</option>
               {myPatients.map(p => (
                 <option key={p.id} value={p.id}>{p.name} - Room {p.room || 'N/A'}</option>
@@ -81,24 +134,24 @@ export default function NurseVitals() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°F)</label>
-              <input type="number" step="0.1" placeholder="98.6" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°C)</label>
+              <input required type="number" step="0.1" placeholder="37.0" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Blood Pressure</label>
-              <input type="text" placeholder="120/80" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+              <input required type="text" placeholder="120/80" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Heart Rate (bpm)</label>
-              <input type="number" placeholder="72" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+              <input required type="number" placeholder="72" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Oxygen Level (%)</label>
-              <input type="number" placeholder="98" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+              <input required type="number" placeholder="98" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
-              <input type="number" step="0.1" placeholder="70" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+              <input required type="number" step="0.1" placeholder="70" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
             </div>
           </div>
           <div>
@@ -109,7 +162,7 @@ export default function NurseVitals() {
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">
               Cancel
             </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700">
+            <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700">
               Save Record
             </button>
           </div>

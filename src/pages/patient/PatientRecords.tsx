@@ -1,8 +1,42 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { patients, vitalSigns, appointments, doctors } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Patient, VitalSign, Appointment, Doctor } from '../../types';
 
 export default function PatientRecords() {
   const { user } = useAuth();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [pData, vData, aData, dData] = await Promise.all([
+          api.fetchPatients(),
+          api.fetchVitals(),
+          api.fetchAppointments(),
+          api.fetchDoctors(),
+        ]);
+        setPatients(pData);
+        setVitalSigns(vData);
+        setAppointments(aData);
+        setDoctors(dData);
+      } catch (err) {
+        console.error('Error fetching patient records:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Medical Records...</p></div>;
+  }
+
   const patientInfo = patients.find(p => p.id === user?.id);
   const myVitals = vitalSigns.filter(v => v.patientId === user?.id).sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
   const myAppointments = appointments.filter(a => a.patientId === user?.id && a.status === 'Completed');
@@ -68,8 +102,8 @@ export default function PatientRecords() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date & Time</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Temp (°F)</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date &amp; Time</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Temp (°C)</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Blood Pressure</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">Heart Rate</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">SpO2</th>
@@ -83,7 +117,7 @@ export default function PatientRecords() {
                       <p className="font-medium text-gray-800">{v.date}</p>
                       <p className="text-xs text-gray-500">{v.time}</p>
                     </td>
-                    <td className={`px-4 py-3 text-sm text-center font-semibold ${v.temperature > 99 ? 'text-red-600' : 'text-gray-800'}`}>{v.temperature}</td>
+                    <td className={`px-4 py-3 text-sm text-center font-semibold ${v.temperature > 37.2 ? 'text-red-600' : 'text-gray-800'}`}>{v.temperature}</td>
                     <td className="px-4 py-3 text-sm text-center font-semibold">{v.bloodPressure}</td>
                     <td className={`px-4 py-3 text-sm text-center font-semibold ${v.heartRate > 90 ? 'text-orange-600' : 'text-gray-800'}`}>{v.heartRate} bpm</td>
                     <td className={`px-4 py-3 text-sm text-center font-semibold ${v.oxygenLevel < 95 ? 'text-red-600' : 'text-green-600'}`}>{v.oxygenLevel}%</td>

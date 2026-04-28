@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { User, UserRole } from '../types';
-import { users } from '../data/mockData';
+import { User } from '../types';
+import * as api from '../utils/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, role: UserRole) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -14,19 +14,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = (email: string, role: UserRole): boolean => {
-    const foundUser = users.find(u => u.email === email && u.role === role);
-    if (foundUser) {
-      setUser(foundUser);
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const userData = await api.loginUser(email, password);
+      // Wait, api needs to be imported
+      setUser(userData);
       return true;
+    } catch (err) {
+      console.error(err);
+      return false;
     }
-    // For demo, auto-create user with role
-    const demoUser = users.find(u => u.role === role);
-    if (demoUser) {
-      setUser(demoUser);
-      return true;
-    }
-    return false;
   };
 
   const logout = () => {

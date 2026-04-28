@@ -1,10 +1,42 @@
+import { useState, useEffect } from 'react';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
-import { patients, vitalSigns, nurses } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Patient, VitalSign, Nurse } from '../../types';
 
 export default function NurseDashboard() {
   const { user } = useAuth();
+  
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([]);
+  const [nurses, setNurses] = useState<Nurse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [patientsData, vitalsData, nursesData] = await Promise.all([
+          api.fetchPatients(),
+          api.fetchVitals(),
+          api.fetchNurses()
+        ]);
+        setPatients(patientsData);
+        setVitalSigns(vitalsData);
+        setNurses(nursesData);
+      } catch (err) {
+        console.error("Error fetching nurse data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading data from Django Backend...</p></div>;
+  }
+
   const nurseInfo = nurses.find(n => n.id === user?.id);
   const myPatients = patients.filter(p => p.assignedNurse === user?.id);
   const myVitals = vitalSigns.filter(v => v.nurseId === user?.id);
@@ -19,10 +51,10 @@ export default function NurseDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Assigned Patients" value={myPatients.length} icon="🏥" change={`${criticalPatients.length} critical`} changeType={criticalPatients.length > 0 ? 'negative' : 'positive'} />
-        <StatCard title="Vitals Recorded Today" value={todayVitals.length} icon="❤️" change="Keep recording" changeType="neutral" />
-        <StatCard title="Medications Due" value={4} icon="💊" change="2 in next hour" changeType="negative" />
-        <StatCard title="Ward" value={nurseInfo?.assignedWard || 'N/A'} icon="🛏️" change={`${nurseInfo?.shift} shift`} changeType="neutral" />
+        <StatCard title="Assigned Patients" value={myPatients.length} icon="🏥" change={`${criticalPatients.length} critical`} changeType={criticalPatients.length > 0 ? 'negative' : 'positive'} href="/nurse/patients" />
+        <StatCard title="Vitals Recorded Today" value={todayVitals.length} icon="❤️" change="Keep recording" changeType="neutral" href="/nurse/vitals" />
+        <StatCard title="Medications Due" value={4} icon="💊" change="2 in next hour" changeType="negative" href="/nurse/medications" />
+        <StatCard title="Ward" value={nurseInfo?.assignedWard || 'N/A'} icon="🛏️" change={`${nurseInfo?.shift || 'No'} shift`} changeType="neutral" href="/nurse/ward" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -32,6 +64,7 @@ export default function NurseDashboard() {
             <h3 className="font-semibold text-gray-800">My Patients</h3>
           </div>
           <div className="divide-y divide-gray-50">
+            {myPatients.length === 0 && <div className="p-4 text-gray-500">No patients assigned.</div>}
             {myPatients.map(p => (
               <div key={p.id} className={`p-4 ${p.status === 'Critical' ? 'bg-red-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
                 <div className="flex items-center justify-between">
@@ -61,6 +94,7 @@ export default function NurseDashboard() {
             <h3 className="font-semibold text-gray-800">Recent Vital Recordings</h3>
           </div>
           <div className="divide-y divide-gray-50">
+            {todayVitals.length === 0 && <div className="p-4 text-gray-500">No vitals recorded today.</div>}
             {todayVitals.slice(0, 5).map(v => (
               <div key={v.id} className="p-4 hover:bg-gray-50/50 transition-colors">
                 <div className="flex items-center justify-between mb-2">
@@ -72,7 +106,7 @@ export default function NurseDashboard() {
                 <div className="grid grid-cols-4 gap-2">
                   <div className="text-center bg-gray-50 rounded p-1.5">
                     <p className="text-xs text-gray-500">Temp</p>
-                    <p className={`text-sm font-bold ${v.temperature > 99 ? 'text-red-600' : 'text-gray-800'}`}>{v.temperature}°</p>
+                    <p className={`text-sm font-bold ${v.temperature > 37.2 ? 'text-red-600' : 'text-gray-800'}`}>{v.temperature}°</p>
                   </div>
                   <div className="text-center bg-gray-50 rounded p-1.5">
                     <p className="text-xs text-gray-500">BP</p>
@@ -99,9 +133,9 @@ export default function NurseDashboard() {
         <h3 className="font-semibold text-gray-800 mb-4">📋 Upcoming Tasks</h3>
         <div className="space-y-3">
           {[
-            { time: '10:00', task: 'Administer medication - John Smith (Room 301-A)', priority: 'high' },
-            { time: '10:30', task: 'Record vitals - Robert Taylor (ICU-2)', priority: 'critical' },
-            { time: '11:00', task: 'Change dressing - Emily Watson (Room 205-B)', priority: 'medium' },
+            { time: '10:00', task: 'Administer medication - John Ochieng (Room 301-A)', priority: 'high' },
+            { time: '10:30', task: 'Record vitals - Robert Kipchoge (ICU-2)', priority: 'critical' },
+            { time: '11:00', task: 'Change dressing - Emily Nduta (Room 205-B)', priority: 'medium' },
             { time: '12:00', task: 'Lunch medication round', priority: 'high' },
             { time: '14:00', task: 'Record vitals - All patients', priority: 'high' },
           ].map((task, i) => (

@@ -1,9 +1,40 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { nurses, patients, departments } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Nurse, Patient, Department } from '../../types';
 import StatusBadge from '../../components/ui/StatusBadge';
 
 export default function NurseWard() {
   const { user } = useAuth();
+  const [nurses, setNurses] = useState<Nurse[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [nData, pData, dData] = await Promise.all([
+          api.fetchNurses(),
+          api.fetchPatients(),
+          api.fetchDepartments(),
+        ]);
+        setNurses(nData);
+        setPatients(pData);
+        setDepartments(dData);
+      } catch (err) {
+        console.error('Error fetching ward data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Ward Information...</p></div>;
+  }
+
   const nurseInfo = nurses.find(n => n.id === user?.id);
   const dept = departments.find(d => d.name === nurseInfo?.department);
   const wardPatients = patients.filter(p => p.assignedNurse === user?.id && (p.status === 'Admitted' || p.status === 'Critical'));
@@ -44,7 +75,7 @@ export default function NurseWard() {
               <p className="text-xs text-orange-600">Occupied</p>
             </div>
             <div className="bg-purple-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-purple-700">{Math.round((dept.bedsOccupied / dept.bedsTotal) * 100)}%</p>
+              <p className="text-2xl font-bold text-purple-700">{dept.bedsTotal > 0 ? Math.round((dept.bedsOccupied / dept.bedsTotal) * 100) : 0}%</p>
               <p className="text-xs text-purple-600">Occupancy Rate</p>
             </div>
           </div>

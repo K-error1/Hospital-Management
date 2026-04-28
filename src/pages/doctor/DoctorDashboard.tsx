@@ -1,13 +1,46 @@
+import { useState, useEffect } from 'react';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
-import { appointments, patients, prescriptions } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Appointment, Patient, Prescription } from '../../types';
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
+  
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [apptsData, patientsData, prescsData] = await Promise.all([
+          api.fetchAppointments(),
+          api.fetchPatients(),
+          api.fetchPrescriptions()
+        ]);
+        setAppointments(apptsData);
+        setPatients(patientsData);
+        setPrescriptions(prescsData);
+      } catch (err) {
+        console.error("Error fetching doctor data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading data from Django Backend...</p></div>;
+  }
+
   const myAppointments = appointments.filter(a => a.doctorId === user?.id);
   const myPatients = patients.filter(p => p.assignedDoctor === user?.id);
-  const todayAppointments = myAppointments.filter(a => a.date === '2026-01-28');
+  const today = new Date().toISOString().split('T')[0];
+  const todayAppointments = myAppointments.filter(a => a.date === today);
   const myPrescriptions = prescriptions.filter(p => p.doctorId === user?.id);
   const criticalPatients = myPatients.filter(p => p.status === 'Critical');
 
@@ -19,10 +52,10 @@ export default function DoctorDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="My Patients" value={myPatients.length} icon="🏥" change={`${criticalPatients.length} critical`} changeType={criticalPatients.length > 0 ? 'negative' : 'positive'} />
-        <StatCard title="Today's Appointments" value={todayAppointments.length} icon="📅" change="View schedule" changeType="neutral" />
-        <StatCard title="Prescriptions Written" value={myPrescriptions.length} icon="💊" change="This month" changeType="neutral" />
-        <StatCard title="Pending Reviews" value={2} icon="📋" change="2 reports due" changeType="negative" />
+        <StatCard title="My Patients" value={myPatients.length} icon="🏥" change={`${criticalPatients.length} critical`} changeType={criticalPatients.length > 0 ? 'negative' : 'positive'} href="/doctor/patients" />
+        <StatCard title="Today's Appointments" value={todayAppointments.length} icon="📅" change="View schedule" changeType="neutral" href="/doctor/appointments" />
+        <StatCard title="Prescriptions Written" value={myPrescriptions.length} icon="💊" change="This month" changeType="neutral" href="/doctor/prescriptions" />
+        <StatCard title="My Schedule" value={myAppointments.length} icon="📋" change="View full schedule" changeType="neutral" href="/doctor/schedule" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -30,7 +63,7 @@ export default function DoctorDashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-semibold text-gray-800">Today's Schedule</h3>
-            <span className="text-sm text-gray-500">Jan 28, 2026</span>
+            <span className="text-sm text-gray-500">{new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </div>
           <div className="divide-y divide-gray-50">
             {todayAppointments.length === 0 ? (
@@ -62,6 +95,7 @@ export default function DoctorDashboard() {
             <h3 className="font-semibold text-gray-800">My Patients</h3>
           </div>
           <div className="divide-y divide-gray-50">
+            {myPatients.length === 0 && <div className="p-6 text-center text-gray-400">No assigned patients</div>}
             {myPatients.slice(0, 5).map(p => (
               <div key={p.id} className={`p-4 ${p.status === 'Critical' ? 'bg-red-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
                 <div className="flex items-center justify-between">

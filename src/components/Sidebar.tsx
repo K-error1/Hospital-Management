@@ -13,10 +13,13 @@ const navItems: Record<UserRole, NavItem[]> = {
     { label: 'Dashboard', path: '/administrator', icon: '📊' },
     { label: 'Doctors', path: '/administrator/doctors', icon: '👨‍⚕️' },
     { label: 'Nurses', path: '/administrator/nurses', icon: '👩‍⚕️' },
+    { label: 'Receptionists', path: '/administrator/receptionists', icon: '📝' },
     { label: 'Patients', path: '/administrator/patients', icon: '🏥' },
     { label: 'Departments', path: '/administrator/departments', icon: '🏢' },
     { label: 'Appointments', path: '/administrator/appointments', icon: '📅' },
     { label: 'Billing', path: '/administrator/billing', icon: '💰' },
+    { label: 'Reports', path: '/administrator/reports', icon: '📈' },
+    { label: 'Audit Logs', path: '/administrator/audit', icon: '🛡️' },
   ],
   doctor: [
     { label: 'Dashboard', path: '/doctor', icon: '📊' },
@@ -39,6 +42,11 @@ const navItems: Record<UserRole, NavItem[]> = {
     { label: 'Prescriptions', path: '/patient/prescriptions', icon: '💊' },
     { label: 'Billing', path: '/patient/billing', icon: '💰' },
   ],
+  receptionist: [
+    { label: 'Dashboard', path: '/receptionist', icon: '📊' },
+    { label: 'Patients', path: '/receptionist/patients', icon: '🏥' },
+    { label: 'Appointments', path: '/receptionist/appointments', icon: '📅' },
+  ],
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -46,6 +54,7 @@ const roleColors: Record<UserRole, string> = {
   doctor: 'from-emerald-700 to-emerald-900',
   nurse: 'from-sky-700 to-sky-900',
   patient: 'from-violet-700 to-violet-900',
+  receptionist: 'from-fuchsia-700 to-fuchsia-900',
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -53,6 +62,7 @@ const roleLabels: Record<UserRole, string> = {
   doctor: 'Doctor',
   nurse: 'Nurse',
   patient: 'Patient',
+  receptionist: 'Receptionist',
 };
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {

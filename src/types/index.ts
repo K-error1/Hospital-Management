@@ -1,4 +1,4 @@
-export type UserRole = 'administrator' | 'doctor' | 'nurse' | 'patient';
+export type UserRole = 'administrator' | 'doctor' | 'nurse' | 'patient' | 'receptionist';
 
 export interface User {
   id: string;
@@ -119,6 +119,8 @@ export interface BillingRecord {
   totalAmount: number;
   status: 'Paid' | 'Pending' | 'Overdue';
   insuranceCovered: number;
+  paymentMethod?: 'mpesa' | 'bank' | 'insurance' | 'cash';
+  paymentRef?: string;
 }
 
 export interface BillingItem {

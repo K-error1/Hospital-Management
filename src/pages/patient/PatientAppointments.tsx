@@ -1,13 +1,68 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Modal from '../../components/ui/Modal';
 import { useAuth } from '../../context/AuthContext';
-import { appointments, doctors } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Appointment, Doctor } from '../../types';
 
 export default function PatientAppointments() {
   const { user } = useAuth();
-  const myAppointments = appointments.filter(a => a.patientId === user?.id);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
+
+  const [bookingData, setBookingData] = useState({ doctorId: '', type: '', date: '', time: '09:00', notes: '' });
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [aData, dData] = await Promise.all([api.fetchAppointments(), api.fetchDoctors()]);
+      setAppointments(aData);
+      setDoctors(dData);
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const doctor = doctors.find(d => d.id === bookingData.doctorId);
+    if (!doctor) return;
+
+    try {
+      await api.post('appointments', {
+        id: `APT-${Date.now()}`,
+        patientId: user.id,
+        patientName: user.name, // assuming user has name
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+        date: bookingData.date,
+        time: bookingData.time,
+        status: 'Scheduled',
+        type: bookingData.type,
+        notes: bookingData.notes
+      });
+      setShowBooking(false);
+      loadData();
+      setBookingData({ doctorId: '', type: '', date: '', time: '09:00', notes: '' });
+    } catch (err) {
+      console.error('Booking failed', err);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Appointments...</p></div>;
+  }
+
+  const myAppointments = appointments.filter(a => a.patientId === user?.id);
 
   return (
     <div className="space-y-6">
@@ -39,7 +94,7 @@ export default function PatientAppointments() {
             <div className="p-4">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold">
-                  {apt.doctorName.replace('Dr. ', '').charAt(0)}
+                  {apt.doctorName ? apt.doctorName.replace('Dr. ', '').charAt(0) : 'D'}
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800">{apt.doctorName}</p>
@@ -58,7 +113,12 @@ export default function PatientAppointments() {
                   <button className="px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium hover:bg-violet-200">
                     Reschedule
                   </button>
-                  <button className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200">
+                  <button onClick={async () => {
+                    if(confirm('Cancel this appointment?')) {
+                      await api.remove('appointments', apt.id);
+                      loadData();
+                    }
+                  }} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200">
                     Cancel
                   </button>
                 </div>
@@ -66,13 +126,19 @@ export default function PatientAppointments() {
             </div>
           </div>
         ))}
+        {myAppointments.length === 0 && (
+          <div className="col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+            <p className="text-4xl mb-3">📅</p>
+            <p className="text-gray-500">No appointments found</p>
+          </div>
+        )}
       </div>
 
       <Modal isOpen={showBooking} onClose={() => setShowBooking(false)} title="Book New Appointment">
-        <form className="space-y-4">
+        <form onSubmit={handleBook} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Select Doctor</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+            <select required value={bookingData.doctorId} onChange={e => setBookingData({...bookingData, doctorId: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
               <option value="">Choose a doctor...</option>
               {doctors.filter(d => d.status !== 'On Leave').map(d => (
                 <option key={d.id} value={d.id}>{d.name} - {d.specialization}</option>
@@ -81,7 +147,7 @@ export default function PatientAppointments() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Type</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+            <select required value={bookingData.type} onChange={e => setBookingData({...bookingData, type: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
               <option value="">Select type...</option>
               <option value="Consultation">Consultation</option>
               <option value="Follow-up">Follow-up</option>
@@ -91,11 +157,11 @@ export default function PatientAppointments() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" />
+              <input required type="date" value={bookingData.date} onChange={e => setBookingData({...bookingData, date: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+              <select required value={bookingData.time} onChange={e => setBookingData({...bookingData, time: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
                 <option>09:00</option><option>09:30</option><option>10:00</option><option>10:30</option>
                 <option>11:00</option><option>14:00</option><option>14:30</option><option>15:00</option>
                 <option>15:30</option><option>16:00</option>
@@ -104,13 +170,13 @@ export default function PatientAppointments() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Notes</label>
-            <textarea rows={3} placeholder="Briefly describe your concern..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" />
+            <textarea value={bookingData.notes} onChange={e => setBookingData({...bookingData, notes: e.target.value})} rows={3} placeholder="Briefly describe your concern..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" />
           </div>
           <div className="flex gap-3 justify-end">
             <button type="button" onClick={() => setShowBooking(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">
               Cancel
             </button>
-            <button type="button" onClick={() => setShowBooking(false)} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700">
+            <button type="submit" className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700">
               Book Appointment
             </button>
           </div>

@@ -1,14 +1,15 @@
-import { UserRole } from '../types';
-import {
-  patients,
-  doctors,
-  nurses,
-  appointments,
-  prescriptions,
-  vitalSigns,
-  departments,
-  billingRecords,
-} from '../data/mockData';
+import { UserRole, Patient, Doctor, Nurse, Appointment, Prescription, VitalSign, Department, BillingRecord } from '../types';
+
+export interface HospitalData {
+  patients: Patient[];
+  doctors: Doctor[];
+  nurses: Nurse[];
+  appointments: Appointment[];
+  prescriptions: Prescription[];
+  vitalSigns: VitalSign[];
+  departments: Department[];
+  billingRecords: BillingRecord[];
+}
 
 export interface ChatMessage {
   id: string;
@@ -56,6 +57,14 @@ const quickActionsByRole: Record<UserRole, QuickAction[]> = {
     { label: 'My Bills', query: 'Show my billing summary', icon: '💰' },
     { label: 'Health Tips', query: 'Give me some health tips for my condition', icon: '💡' },
   ],
+  receptionist: [
+    { label: 'Today\'s Appointments', query: 'Show today\'s appointments', icon: '📅' },
+    { label: 'Find Patient', query: 'Help me find a patient', icon: '🔍' },
+    { label: 'Available Doctors', query: 'Which doctors are available now?', icon: '👨‍⚕️' },
+    { label: 'Register Guide', query: 'How do I register a patient?', icon: '📝' },
+    { label: 'Bed Status', query: 'What is the bed occupancy?', icon: '🛏️' },
+    { label: 'Critical Patients', query: 'Show critical patients', icon: '🚨' },
+  ],
 };
 
 export function getQuickActions(role: UserRole): QuickAction[] {
@@ -69,7 +78,8 @@ function delay(ms: number): Promise<void> {
 export async function generateAIResponse(
   query: string,
   role: UserRole,
-  userId: string
+  userId: string,
+  data: HospitalData
 ): Promise<string> {
   // Simulate thinking delay
   await delay(600 + Math.random() * 1000);
@@ -78,28 +88,28 @@ export async function generateAIResponse(
 
   // ── ADMINISTRATOR RESPONSES ──
   if (role === 'administrator') {
-    return generateAdminResponse(q);
+    return generateAdminResponse(q, data);
   }
 
   // ── DOCTOR RESPONSES ──
   if (role === 'doctor') {
-    return generateDoctorResponse(q, userId);
+    return generateDoctorResponse(q, userId, data);
   }
 
   // ── NURSE RESPONSES ──
   if (role === 'nurse') {
-    return generateNurseResponse(q, userId);
+    return generateNurseResponse(q, userId, data);
   }
 
   // ── PATIENT RESPONSES ──
   if (role === 'patient') {
-    return generatePatientResponse(q, userId);
+    return generatePatientResponse(q, userId, data);
   }
 
   return getGenericResponse(q);
 }
 
-function generateAdminResponse(q: string): string {
+function generateAdminResponse(q: string, { patients, doctors, nurses, appointments, departments, billingRecords, vitalSigns }: HospitalData): string {
   // Hospital Overview
   if (matchesAny(q, ['overview', 'summary', 'hospital status', 'how is the hospital', 'dashboard'])) {
     const totalPatients = patients.length;
@@ -284,7 +294,7 @@ ${departments
   return getGenericResponse(q);
 }
 
-function generateDoctorResponse(q: string, userId: string): string {
+function generateDoctorResponse(q: string, userId: string, { patients, doctors, appointments, prescriptions, vitalSigns }: HospitalData): string {
   const myPatients = patients.filter((p) => p.assignedDoctor === userId);
   const myAppointments = appointments.filter((a) => a.doctorId === userId);
   const myPrescriptions = prescriptions.filter((p) => p.doctorId === userId);
@@ -410,7 +420,7 @@ By Type:
   return getGenericResponse(q);
 }
 
-function generateNurseResponse(q: string, userId: string): string {
+function generateNurseResponse(q: string, userId: string, { patients, doctors, nurses, prescriptions, vitalSigns, departments }: HospitalData): string {
   const currentNurse = nurses.find((n) => n.id === userId);
   const myPatients_ = patients.filter((p) => p.assignedNurse === userId);
   const myVitals = vitalSigns.filter((v) => v.nurseId === userId);
@@ -537,7 +547,7 @@ ${vitals ? `• Vitals: BP ${vitals.bloodPressure} | HR ${vitals.heartRate} | Sp
   return getGenericResponse(q);
 }
 
-function generatePatientResponse(q: string, userId: string): string {
+function generatePatientResponse(q: string, userId: string, { patients, doctors, nurses, appointments, prescriptions, vitalSigns, billingRecords }: HospitalData): string {
   const myData = patients.find((p) => p.id === userId);
   const myAppointments = appointments.filter((a) => a.patientId === userId);
   const myPrescriptions = prescriptions.filter((p) => p.patientId === userId);
@@ -600,7 +610,7 @@ ${p.notes ? `\n📝 _Doctor's note: ${p.notes}_` : ''}`
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| 🌡️ Temperature | ${latest.temperature}°F | ${latest.temperature > 99.5 ? '⚠️ Elevated' : '✅ Normal'} |
+| 🌡️ Temperature | ${latest.temperature}°C | ${latest.temperature > 37.5 ? '⚠️ Elevated' : '✅ Normal'} |
 | 💉 Blood Pressure | ${latest.bloodPressure} | ${parseInt(latest.bloodPressure) > 140 ? '⚠️ High' : '✅ Normal'} |
 | 💓 Heart Rate | ${latest.heartRate} bpm | ${latest.heartRate > 100 ? '⚠️ Elevated' : '✅ Normal'} |
 | 🫁 Oxygen Level | ${latest.oxygenLevel}% | ${latest.oxygenLevel < 95 ? '⚠️ Low' : '✅ Normal'} |

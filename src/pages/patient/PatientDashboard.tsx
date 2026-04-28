@@ -1,15 +1,57 @@
+import { useState, useEffect } from 'react';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
-import { appointments, prescriptions, billingRecords, patients, doctors, vitalSigns } from '../../data/mockData';
+import * as api from '../../utils/api';
+import { Appointment, Prescription, BillingRecord, Patient, Doctor, VitalSign } from '../../types';
 
 export default function PatientDashboard() {
   const { user } = useAuth();
+  
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [apptsData, prescsData, billsData, patientsData, doctorsData, vitalsData] = await Promise.all([
+          api.fetchAppointments(),
+          api.fetchPrescriptions(),
+          api.fetchBilling(),
+          api.fetchPatients(),
+          api.fetchDoctors(),
+          api.fetchVitals()
+        ]);
+        setAppointments(apptsData);
+        setPrescriptions(prescsData);
+        setBillingRecords(billsData);
+        setPatients(patientsData);
+        setDoctors(doctorsData);
+        setVitalSigns(vitalsData);
+      } catch (err) {
+        console.error("Error fetching patient data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading data from Django Backend...</p></div>;
+  }
+
   const patientInfo = patients.find(p => p.id === user?.id);
   const myAppointments = appointments.filter(a => a.patientId === user?.id);
   const myPrescriptions = prescriptions.filter(p => p.patientId === user?.id);
   const myBills = billingRecords.filter(b => b.patientId === user?.id);
   const myVitals = vitalSigns.filter(v => v.patientId === user?.id);
+  
   const latestVitals = myVitals.length > 0 ? myVitals[myVitals.length - 1] : null;
   const doctorName = patientInfo ? doctors.find(d => d.id === patientInfo.assignedDoctor)?.name : 'N/A';
   const upcomingAppts = myAppointments.filter(a => a.status === 'Scheduled');
@@ -44,10 +86,10 @@ export default function PatientDashboard() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Upcoming Appointments" value={upcomingAppts.length} icon="📅" change="View all" changeType="neutral" />
-        <StatCard title="Active Medications" value={myPrescriptions.reduce((sum, p) => sum + p.medications.length, 0)} icon="💊" change={`${myPrescriptions.length} prescriptions`} changeType="neutral" />
-        <StatCard title="Balance Due" value={`$${totalDue.toLocaleString()}`} icon="💰" change={`${pendingBills.length} pending bills`} changeType={totalDue > 0 ? 'negative' : 'positive'} />
-        <StatCard title="Last Visit" value={myAppointments.filter(a => a.status === 'Completed').length > 0 ? myAppointments.filter(a => a.status === 'Completed')[0].date : 'N/A'} icon="🏥" change="Completed" changeType="positive" />
+        <StatCard title="Upcoming Appointments" value={upcomingAppts.length} icon="📅" change="View all" changeType="neutral" href="/patient/appointments" />
+        <StatCard title="Active Medications" value={myPrescriptions.reduce((sum, p) => sum + p.medications.length, 0)} icon="💊" change={`${myPrescriptions.length} prescriptions`} changeType="neutral" href="/patient/prescriptions" />
+        <StatCard title="Balance Due" value={`Ksh ${totalDue.toLocaleString()}`} icon="💰" change={`${pendingBills.length} pending bills`} changeType={totalDue > 0 ? 'negative' : 'positive'} href="/patient/billing" />
+        <StatCard title="Last Visit" value={myAppointments.filter(a => a.status === 'Completed').length > 0 ? myAppointments.filter(a => a.status === 'Completed')[0].date : 'N/A'} icon="🏥" change="Completed" changeType="positive" href="/patient/records" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -61,7 +103,7 @@ export default function PatientDashboard() {
             <div className="p-4 grid grid-cols-2 gap-4">
               <div className="bg-red-50 rounded-lg p-4 text-center">
                 <p className="text-3xl mb-1">🌡️</p>
-                <p className="text-2xl font-bold text-gray-800">{latestVitals.temperature}°F</p>
+                <p className="text-2xl font-bold text-gray-800">{latestVitals.temperature}°C</p>
                 <p className="text-xs text-gray-500">Temperature</p>
               </div>
               <div className="bg-blue-50 rounded-lg p-4 text-center">

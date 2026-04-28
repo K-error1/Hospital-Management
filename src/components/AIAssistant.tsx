@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { ChatMessage, QuickAction, getQuickActions, generateAIResponse } from '../utils/aiEngine';
 import { UserRole } from '../types';
 
@@ -39,6 +40,15 @@ const roleColors: Record<UserRole, { bg: string; gradient: string; text: string;
     ring: 'ring-violet-500',
     button: 'bg-violet-600 hover:bg-violet-700',
     bubbleBg: 'bg-violet-600',
+  },
+  receptionist: {
+    bg: 'bg-fuchsia-600',
+    gradient: 'from-fuchsia-600 to-fuchsia-700',
+    text: 'text-fuchsia-600',
+    light: 'bg-fuchsia-50',
+    ring: 'ring-fuchsia-500',
+    button: 'bg-fuchsia-600 hover:bg-fuchsia-700',
+    bubbleBg: 'bg-fuchsia-600',
   },
 };
 
@@ -138,6 +148,7 @@ function QuickActionButton({ action, onClick, roleColor }: { action: QuickAction
 
 export default function AIAssistant() {
   const { user } = useAuth();
+  const { patients, doctors, nurses, appointments, prescriptions, vitalSigns, departments, billingRecords } = useData();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -151,6 +162,8 @@ export default function AIAssistant() {
   const role = user?.role || 'patient';
   const colors = roleColors[role];
   const quickActions = getQuickActions(role);
+
+  const liveData = { patients, doctors, nurses, appointments, prescriptions, vitalSigns, departments, billingRecords };
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -203,7 +216,7 @@ Here are some things I can help you with — just click a quick action button or
     setIsTyping(true);
 
     try {
-      const response = await generateAIResponse(query, role, user?.id || '');
+      const response = await generateAIResponse(query, role, user?.id || '', liveData);
       const aiMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',

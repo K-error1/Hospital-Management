@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 
@@ -8,9 +9,12 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminDoctors from './pages/admin/AdminDoctors';
 import AdminNurses from './pages/admin/AdminNurses';
 import AdminPatients from './pages/admin/AdminPatients';
+import AdminReceptionists from './pages/admin/AdminReceptionists';
 import AdminDepartments from './pages/admin/AdminDepartments';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import AdminBilling from './pages/admin/AdminBilling';
+import AdminReports from './pages/admin/AdminReports';
+import AdminAuditLogs from './pages/admin/AdminAuditLogs';
 
 // Doctor pages
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
@@ -32,6 +36,11 @@ import PatientAppointments from './pages/patient/PatientAppointments';
 import PatientRecords from './pages/patient/PatientRecords';
 import PatientPrescriptions from './pages/patient/PatientPrescriptions';
 import PatientBilling from './pages/patient/PatientBilling';
+
+// Receptionist pages
+import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
+import ReceptionistPatients from './pages/receptionist/ReceptionistPatients';
+import ReceptionistAppointments from './pages/receptionist/ReceptionistAppointments';
 
 import { ReactNode } from 'react';
 import { UserRole } from './types';
@@ -72,10 +81,13 @@ function AppRoutes() {
         <Route path="/administrator" element={<AdminDashboard />} />
         <Route path="/administrator/doctors" element={<AdminDoctors />} />
         <Route path="/administrator/nurses" element={<AdminNurses />} />
+        <Route path="/administrator/receptionists" element={<AdminReceptionists />} />
         <Route path="/administrator/patients" element={<AdminPatients />} />
         <Route path="/administrator/departments" element={<AdminDepartments />} />
         <Route path="/administrator/appointments" element={<AdminAppointments />} />
         <Route path="/administrator/billing" element={<AdminBilling />} />
+        <Route path="/administrator/reports" element={<AdminReports />} />
+        <Route path="/administrator/audit" element={<AdminAuditLogs />} />
       </Route>
 
       {/* Doctor Routes */}
@@ -123,6 +135,19 @@ function AppRoutes() {
         <Route path="/patient/billing" element={<PatientBilling />} />
       </Route>
 
+      {/* Receptionist Routes */}
+      <Route
+        element={
+          <ProtectedRoute allowedRole="receptionist">
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/receptionist" element={<ReceptionistDashboard />} />
+        <Route path="/receptionist/patients" element={<ReceptionistPatients />} />
+        <Route path="/receptionist/appointments" element={<ReceptionistAppointments />} />
+      </Route>
+
       {/* Default redirect */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
@@ -133,7 +158,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <DataProvider>
+          <AppRoutes />
+        </DataProvider>
       </AuthProvider>
     </BrowserRouter>
   );
