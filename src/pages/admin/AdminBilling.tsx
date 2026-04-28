@@ -79,22 +79,22 @@ export default function AdminBilling() {
       let ref = '';
 
       if (payMethod === 'mpesa') {
-        const res = await api.initiateMPesa(payPhone, balance, payModal.id, `Bill ${payModal.id}`);
-        ref = res?.CheckoutRequestID || 'MPESA-' + Date.now();
-      } else if (payMethod === 'bank') {
-        ref = payBankRef || 'BANK-' + Date.now();
-      } else if (payMethod === 'insurance') {
-        ref = `INS-${payInsProvider}-${payInsNumber}`;
+        const res = await api.payBill(payModal.id, balance, payPhone);
+        ref = res?.reference || 'MOCK-' + Date.now();
       } else {
-        ref = payCashRef || 'CASH-' + Date.now();
-      }
+        if (payMethod === 'bank') ref = payBankRef || 'BANK-' + Date.now();
+        else if (payMethod === 'insurance') ref = `INS-${payInsProvider}-${payInsNumber}`;
+        else ref = payCashRef || 'CASH-' + Date.now();
 
-      await api.put('billing', payModal.id, {
-        ...payModal,
-        status: 'Paid',
-        paymentMethod: payMethod,
-        paymentRef: ref,
-      });
+        await api.put('billing', payModal.id, {
+          ...payModal,
+          status: 'Paid',
+          payment_status: 'Paid',
+          paidAmount: payModal.totalAmount - payModal.insuranceCovered,
+          paymentMethod: payMethod,
+          paymentRef: ref,
+        });
+      }
 
       setPaySuccess(true);
       await loadData();
@@ -124,6 +124,8 @@ export default function AdminBilling() {
         items: newBillItems,
         totalAmount,
         status: 'Pending',
+        payment_status: 'Unpaid',
+        paidAmount: 0,
         insuranceCovered: newBillInsurance,
       };
 
@@ -145,8 +147,11 @@ export default function AdminBilling() {
   }
 
   const totalRevenue = billingRecords.reduce((sum, b) => sum + b.totalAmount, 0);
-  const pendingAmount = billingRecords.filter(b => b.status === 'Pending').reduce((sum, b) => sum + b.totalAmount, 0);
-  const paidAmount = billingRecords.filter(b => b.status === 'Paid').reduce((sum, b) => sum + b.totalAmount, 0);
+  const totalPaid = billingRecords.reduce((sum, b) => sum + (b.paidAmount || 0), 0);
+  const pendingAmount = billingRecords.reduce((sum, b) => {
+    const bal = b.totalAmount - b.insuranceCovered - (b.paidAmount || 0);
+    return sum + (bal > 0 ? bal : 0);
+  }, 0);
   const insuranceCovered = billingRecords.reduce((sum, b) => sum + b.insuranceCovered, 0);
 
   const methodBadge = (m?: string) => {
@@ -160,10 +165,10 @@ export default function AdminBilling() {
     { key: 'patientName', label: 'Patient', render: (b: BillingRecord) => <span className="font-medium text-gray-800">{b.patientName}</span> },
     { key: 'date', label: 'Date' },
     { key: 'totalAmount', label: 'Amount', render: (b: BillingRecord) => <span className="font-semibold">Ksh {b.totalAmount.toLocaleString()}</span> },
-    { key: 'insuranceCovered', label: 'Insurance', render: (b: BillingRecord) => <span className="text-green-600">Ksh {b.insuranceCovered.toLocaleString()}</span> },
-    { key: 'balance', label: 'Balance', render: (b: BillingRecord) => <span className="font-semibold text-orange-600">Ksh {(b.totalAmount - b.insuranceCovered).toLocaleString()}</span> },
-    { key: 'paymentMethod', label: 'Method', render: (b: BillingRecord) => methodBadge(b.paymentMethod) || <span className="text-gray-400 text-xs">—</span> },
-    { key: 'status', label: 'Status', render: (b: BillingRecord) => <StatusBadge status={b.status} /> },
+    { key: 'paidAmount', label: 'Paid', render: (b: BillingRecord) => <span className="text-blue-600 font-medium">Ksh {(b.paidAmount || 0).toLocaleString()}</span> },
+    { key: 'balance', label: 'Balance', render: (b: BillingRecord) => <span className="font-semibold text-orange-600">Ksh {(b.totalAmount - b.insuranceCovered - (b.paidAmount || 0)).toLocaleString()}</span> },
+    { key: 'payment_status', label: 'Payment', render: (b: BillingRecord) => <StatusBadge status={b.payment_status} /> },
+    { key: 'status', label: 'Workflow', render: (b: BillingRecord) => <StatusBadge status={b.status} /> },
     {
       key: 'actions', label: 'Actions',
       render: (b: BillingRecord) => (
@@ -196,8 +201,8 @@ export default function AdminBilling() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Revenue" value={`Ksh ${(totalRevenue / 1000).toFixed(1)}K`} icon="💰" change="+0% vs last month" changeType="positive" />
-        <StatCard title="Paid" value={`Ksh ${(paidAmount / 1000).toFixed(1)}K`} icon="✅" change={`${billingRecords.filter(b => b.status === 'Paid').length} bills`} changeType="positive" />
-        <StatCard title="Pending" value={`Ksh ${(pendingAmount / 1000).toFixed(1)}K`} icon="⏳" change={`${billingRecords.filter(b => b.status === 'Pending').length} bills`} changeType="negative" />
+        <StatCard title="Total Paid" value={`Ksh ${(totalPaid / 1000).toFixed(1)}K`} icon="✅" change={`${billingRecords.filter(b => b.payment_status === 'Paid').length} bills paid`} changeType="positive" />
+        <StatCard title="Pending" value={`Ksh ${(pendingAmount / 1000).toFixed(1)}K`} icon="⏳" change={`${billingRecords.filter(b => b.payment_status !== 'Paid').length} bills pending`} changeType="negative" />
         <StatCard title="Insurance Covered" value={`Ksh ${(insuranceCovered / 1000).toFixed(1)}K`} icon="🛡️" change={totalRevenue > 0 ? `${Math.round((insuranceCovered / totalRevenue) * 100)}% of total` : '0%'} changeType="neutral" />
       </div>
 
@@ -265,8 +270,9 @@ export default function AdminBilling() {
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-gray-600">Total Amount</span><span className="font-bold">Ksh {selectedBill.totalAmount.toLocaleString()}</span></div>
               <div className="flex justify-between text-sm"><span className="text-gray-600">Insurance Coverage</span><span className="text-green-600 font-medium">-Ksh {selectedBill.insuranceCovered.toLocaleString()}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-600">Amount Paid</span><span className="text-blue-600 font-medium">Ksh {(selectedBill.paidAmount || 0).toLocaleString()}</span></div>
               <hr />
-              <div className="flex justify-between text-base"><span className="font-bold text-gray-800">Balance Due</span><span className="font-bold text-orange-600">Ksh {(selectedBill.totalAmount - selectedBill.insuranceCovered).toLocaleString()}</span></div>
+              <div className="flex justify-between text-base"><span className="font-bold text-gray-800">Remaining Balance</span><span className="font-bold text-orange-600">Ksh {(selectedBill.totalAmount - selectedBill.insuranceCovered - (selectedBill.paidAmount || 0)).toLocaleString()}</span></div>
             </div>
 
             {selectedBill.status === 'Pending' && (
@@ -300,8 +306,11 @@ export default function AdminBilling() {
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <p className="font-semibold text-gray-800">{payModal.patientName}</p>
                   <p className="text-sm text-gray-500">Bill #{payModal.id}</p>
-                  <p className="text-2xl font-bold text-orange-600 mt-1">Ksh {(payModal.totalAmount - payModal.insuranceCovered).toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">Balance due (after insurance: Ksh {payModal.insuranceCovered.toLocaleString()})</p>
+                  <p className="text-2xl font-bold text-orange-600 mt-1">Ksh {(payModal.totalAmount - payModal.insuranceCovered - (payModal.paidAmount || 0)).toLocaleString()}</p>
+                  <div className="flex justify-between mt-2 text-xs text-gray-500">
+                    <span>🛡️ Insurance: Ksh {payModal.insuranceCovered.toLocaleString()}</span>
+                    <span>💰 Paid: Ksh {(payModal.paidAmount || 0).toLocaleString()}</span>
+                  </div>
                 </div>
 
                 {/* Method selector */}

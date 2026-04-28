@@ -66,22 +66,23 @@ export default function PatientBilling() {
       let ref = '';
 
       if (payMethod === 'mpesa') {
-        const res = await api.initiateMPesa(payPhone, balance, selectedBill.id, `Bill ${selectedBill.id}`);
-        ref = res?.CheckoutRequestID || 'MPESA-' + Date.now();
-      } else if (payMethod === 'bank') {
-        ref = payBankRef || 'BANK-' + Date.now();
-      } else if (payMethod === 'insurance') {
-        ref = `INS-${payInsProvider}-${payInsNumber}`;
+        const res = await api.payBill(selectedBill.id, balance, payPhone);
+        ref = res?.reference || 'MOCK-' + Date.now();
       } else {
-        ref = 'CASH-' + Date.now();
-      }
+        // Fallback for other methods using manual update for now
+        if (payMethod === 'bank') ref = payBankRef || 'BANK-' + Date.now();
+        else if (payMethod === 'insurance') ref = `INS-${payInsProvider}-${payInsNumber}`;
+        else ref = 'CASH-' + Date.now();
 
-      await api.put('billing', selectedBill.id, {
-        ...selectedBill,
-        status: 'Paid',
-        paymentMethod: payMethod,
-        paymentRef: ref,
-      });
+        await api.put('billing', selectedBill.id, {
+          ...selectedBill,
+          status: 'Paid',
+          payment_status: 'Paid',
+          paidAmount: selectedBill.totalAmount - selectedBill.insuranceCovered,
+          paymentMethod: payMethod,
+          paymentRef: ref,
+        });
+      }
 
       setPaySuccess(true);
       await loadData();
@@ -99,7 +100,11 @@ export default function PatientBilling() {
   const myBills = billingRecords.filter(b => b.patientId === user?.id);
   const totalBilled = myBills.reduce((sum, b) => sum + b.totalAmount, 0);
   const totalInsurance = myBills.reduce((sum, b) => sum + b.insuranceCovered, 0);
-  const totalDue = myBills.filter(b => b.status === 'Pending').reduce((sum, b) => sum + (b.totalAmount - b.insuranceCovered), 0);
+  const totalPaid = myBills.reduce((sum, b) => sum + (b.paidAmount || 0), 0);
+  const totalDue = myBills.reduce((sum, b) => {
+    const bal = b.totalAmount - b.insuranceCovered - (b.paidAmount || 0);
+    return sum + (bal > 0 ? bal : 0);
+  }, 0);
 
   const methodBadge = (m?: string) => {
     if (!m) return null;
@@ -156,9 +161,10 @@ export default function PatientBilling() {
                     </div>
                     <div className="text-right">
                       <p className="text-xl font-bold text-gray-800">Ksh {bill.totalAmount.toLocaleString()}</p>
-                      <p className="text-sm text-green-600">Insurance: -Ksh {bill.insuranceCovered.toLocaleString()}</p>
-                      <p className={`text-sm font-semibold ${bill.status === 'Paid' ? 'text-green-600' : 'text-orange-600'}`}>
-                        {bill.status === 'Paid' ? '✅ Paid' : `Due: Ksh ${balance.toLocaleString()}`}
+                      <p className="text-xs text-green-600">Insurance: -Ksh {bill.insuranceCovered.toLocaleString()}</p>
+                      <p className="text-xs text-blue-600">Paid: Ksh {(bill.paidAmount || 0).toLocaleString()}</p>
+                      <p className={`text-sm font-semibold mt-1 ${bill.payment_status === 'Paid' ? 'text-green-600' : 'text-orange-600'}`}>
+                        {bill.payment_status === 'Paid' ? '✅ Paid' : `Balance: Ksh ${(bill.totalAmount - bill.insuranceCovered - (bill.paidAmount || 0)).toLocaleString()}`}
                       </p>
                     </div>
                   </div>
@@ -169,7 +175,7 @@ export default function PatientBilling() {
                       onClick={(e) => { e.stopPropagation(); openBill(bill); setShowPayPanel(true); }}
                       className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md shadow-violet-200"
                     >
-                      💳 Pay Now — Ksh {balance.toLocaleString()}
+                      💳 Pay Remaining — Ksh {(bill.totalAmount - bill.insuranceCovered - (bill.paidAmount || 0)).toLocaleString()}
                     </button>
                   </div>
                 )}
@@ -202,8 +208,11 @@ export default function PatientBilling() {
               <>
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
                   <p className="text-sm text-gray-500">Paying for Bill #{selectedBill.id}</p>
-                  <p className="text-3xl font-bold text-orange-600 mt-1">Ksh {(selectedBill.totalAmount - selectedBill.insuranceCovered).toLocaleString()}</p>
-                  {selectedBill.insuranceCovered > 0 && <p className="text-xs text-green-600 mt-1">✅ Insurance covers Ksh {selectedBill.insuranceCovered.toLocaleString()}</p>}
+                  <p className="text-3xl font-bold text-orange-600 mt-1">Ksh {(selectedBill.totalAmount - selectedBill.insuranceCovered - (selectedBill.paidAmount || 0)).toLocaleString()}</p>
+                  <div className="flex justify-between mt-2 text-xs">
+                    {selectedBill.insuranceCovered > 0 && <span className="text-green-600 font-medium">🛡️ Insurance Covered: Ksh {selectedBill.insuranceCovered.toLocaleString()}</span>}
+                    {(selectedBill.paidAmount || 0) > 0 && <span className="text-blue-600 font-medium">💰 Previously Paid: Ksh {(selectedBill.paidAmount || 0).toLocaleString()}</span>}
+                  </div>
                 </div>
 
                 {/* Method selector */}

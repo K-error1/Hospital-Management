@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import StatCard from '../../components/ui/StatCard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../context/AuthContext';
@@ -97,7 +98,11 @@ export default function DoctorDashboard() {
           <div className="divide-y divide-gray-50">
             {myPatients.length === 0 && <div className="p-6 text-center text-gray-400">No assigned patients</div>}
             {myPatients.slice(0, 5).map(p => (
-              <div key={p.id} className={`p-4 ${p.status === 'Critical' ? 'bg-red-50/50' : 'hover:bg-gray-50/50'} transition-colors`}>
+              <Link 
+                to="/doctor/patients" 
+                key={p.id} 
+                className={`block p-4 ${p.status === 'Critical' ? 'bg-red-50/50' : 'hover:bg-gray-50/50'} transition-colors cursor-pointer border-b border-gray-50 last:border-0`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-bold text-sm">
@@ -110,7 +115,7 @@ export default function DoctorDashboard() {
                   </div>
                   <StatusBadge status={p.status} />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -130,9 +135,12 @@ export default function DoctorDashboard() {
                   <p className="font-medium text-gray-800">{p.name}</p>
                   <p className="text-sm text-gray-500">{p.diagnosis} • Room: {p.room}</p>
                 </div>
-                <button className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
+                <Link 
+                  to="/doctor/patients"
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                >
                   View Details
-                </button>
+                </Link>
               </div>
             ))}
           </div>

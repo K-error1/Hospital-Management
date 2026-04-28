@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import ChangePassword from './pages/ChangePassword';
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -52,6 +53,10 @@ function ProtectedRoute({ children, allowedRole }: { children: ReactNode; allowe
     return <Navigate to="/login" replace />;
   }
 
+  if (user?.must_change_password) {
+    return <Navigate to="/change-password" replace />;
+  }
+
   if (user?.role !== allowedRole) {
     return <Navigate to={`/${user?.role}`} replace />;
   }
@@ -64,10 +69,22 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Login */}
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to={`/${user?.role}`} replace /> : <Login />}
+        element={
+          isAuthenticated 
+            ? <Navigate to={user?.must_change_password ? "/change-password" : `/${user?.role}`} replace /> 
+            : <Login />
+        }
+      />
+
+      <Route
+        path="/change-password"
+        element={
+          isAuthenticated 
+            ? (user?.must_change_password ? <ChangePassword /> : <Navigate to={`/${user?.role}`} replace />)
+            : <Navigate to="/login" replace />
+        }
       />
 
       {/* Administrator Routes */}

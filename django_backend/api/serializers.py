@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Patient, Doctor, Nurse, Appointment, Prescription, VitalSign, Department, BillingRecord
+from .models import User, Patient, Doctor, Nurse, Appointment, Prescription, VitalSign, Department, BillingRecord, AuditLog
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,4 +44,9 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class BillingRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = BillingRecord
+        fields = '__all__'
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AuditLog
         fields = '__all__'

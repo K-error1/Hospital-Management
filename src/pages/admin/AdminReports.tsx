@@ -110,41 +110,62 @@ export default function AdminReports() {
 
   // Excel Export
   const exportExcel = () => {
-    const wb = XLSX.utils.book_new();
+    try {
+      console.log('Starting Excel export...');
+      const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Billing
-    const billingWs = XLSX.utils.json_to_sheet(billing.map(b => ({
-      'ID': b.id,
-      'Patient Name': b.patientName,
-      'Date': b.date,
-      'Status': b.status,
-      'Total Amount': b.totalAmount
-    })));
-    XLSX.utils.book_append_sheet(wb, billingWs, "Billing");
+      // Sheet 1: Billing - Ensure we handle potential nulls/undefined
+      const billingData = billing.map(b => ({
+        'Bill ID': b.id || '',
+        'Patient': b.patientName || '',
+        'Date': b.date || '',
+        'Workflow Status': b.status || '',
+        'Payment Status': b.payment_status || 'Unpaid',
+        'Total Amount': Number(b.totalAmount) || 0,
+        'Insurance': Number(b.insuranceCovered) || 0,
+        'Paid': Number(b.paidAmount) || 0,
+        'Balance': (Number(b.totalAmount) || 0) - (Number(b.insuranceCovered) || 0) - (Number(b.paidAmount) || 0)
+      }));
+      
+      const billingWs = XLSX.utils.json_to_sheet(billingData);
+      XLSX.utils.book_append_sheet(wb, billingWs, "Billing Records");
 
-    // Sheet 2: Patients
-    const patientsWs = XLSX.utils.json_to_sheet(patients.map(p => ({
-      'ID': p.id,
-      'Name': p.name,
-      'Age': p.age,
-      'Gender': p.gender,
-      'Status': p.status,
-      'Diagnosis': p.diagnosis
-    })));
-    XLSX.utils.book_append_sheet(wb, patientsWs, "Patients");
+      // Sheet 2: Patients
+      const patientsData = patients.map(p => ({
+        'Patient ID': p.id || '',
+        'Full Name': p.name || '',
+        'Age': p.age || 0,
+        'Gender': p.gender || '',
+        'Blood Group': p.bloodGroup || '',
+        'Phone': p.phone || '',
+        'Condition': p.status || '',
+        'Diagnosis': p.diagnosis || ''
+      }));
+      
+      const patientsWs = XLSX.utils.json_to_sheet(patientsData);
+      XLSX.utils.book_append_sheet(wb, patientsWs, "Patients List");
 
-    // Sheet 3: Appointments
-    const apptWs = XLSX.utils.json_to_sheet(appointments.map(a => ({
-      'ID': a.id,
-      'Patient': a.patientName,
-      'Doctor': a.doctorName,
-      'Date': a.date,
-      'Time': a.time,
-      'Status': a.status
-    })));
-    XLSX.utils.book_append_sheet(wb, apptWs, "Appointments");
+      // Sheet 3: Appointments
+      const apptData = appointments.map(a => ({
+        'Appt ID': a.id || '',
+        'Patient': a.patientName || '',
+        'Doctor': a.doctorName || '',
+        'Date': a.date || '',
+        'Time': a.time || '',
+        'Type': a.type || '',
+        'Status': a.status || ''
+      }));
+      
+      const apptWs = XLSX.utils.json_to_sheet(apptData);
+      XLSX.utils.book_append_sheet(wb, apptWs, "Appointments");
 
-    XLSX.writeFile(wb, 'admin_hospital_data.xlsx');
+      // Generate the file
+      XLSX.writeFile(wb, `Hospital_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      console.log('Excel export complete!');
+    } catch (err) {
+      console.error('Excel Export Error:', err);
+      alert('Failed to generate Excel report. Check console for details.');
+    }
   };
 
   return (

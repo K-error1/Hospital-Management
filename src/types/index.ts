@@ -9,6 +9,7 @@ export interface User {
   department?: string;
   specialization?: string;
   phone?: string;
+  must_change_password?: boolean;
 }
 
 export interface Patient {
@@ -117,7 +118,9 @@ export interface BillingRecord {
   date: string;
   items: BillingItem[];
   totalAmount: number;
+  paidAmount: number;
   status: 'Paid' | 'Pending' | 'Overdue';
+  payment_status: 'Paid' | 'Partial' | 'Unpaid';
   insuranceCovered: number;
   paymentMethod?: 'mpesa' | 'bank' | 'insurance' | 'cash';
   paymentRef?: string;
@@ -127,4 +130,13 @@ export interface BillingItem {
   description: string;
   amount: number;
   quantity: number;
+}
+
+export interface AuditLog {
+  id: number;
+  user: string;
+  role: string;
+  action: string;
+  details?: string;
+  timestamp: string;
 }

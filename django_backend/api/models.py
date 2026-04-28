@@ -10,6 +10,7 @@ class User(AbstractUser):
     department = models.CharField(max_length=100, null=True, blank=True)
     specialization = models.CharField(max_length=100, null=True, blank=True)
     phone = models.CharField(max_length=50, null=True, blank=True)
+    must_change_password = models.BooleanField(default=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'name', 'role']
@@ -108,5 +109,17 @@ class BillingRecord(models.Model):
     totalAmount = models.FloatField()
     status = models.CharField(max_length=50)
     insuranceCovered = models.FloatField(default=0)
+    paidAmount = models.FloatField(default=0)
+    payment_status = models.CharField(max_length=50, default='Unpaid')
     paymentMethod = models.CharField(max_length=50, null=True, blank=True)
     paymentRef = models.CharField(max_length=100, null=True, blank=True)
+
+class AuditLog(models.Model):
+    user = models.CharField(max_length=255)
+    role = models.CharField(max_length=100)
+    action = models.CharField(max_length=255)
+    details = models.TextField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} ({self.role}) - {self.action} at {self.timestamp}"

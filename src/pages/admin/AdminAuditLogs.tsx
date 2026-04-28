@@ -1,62 +1,116 @@
 import { useState, useEffect } from 'react';
 import DataTable from '../../components/ui/DataTable';
-
-interface AuditLog {
-  id: string;
-  user: string;
-  role: string;
-  action: string;
-  details: string;
-  timestamp: string;
-}
-
-// Mock data since we don't have a backend endpoint for audit logs yet
-const MOCK_LOGS: AuditLog[] = [
-  { id: 'LOG-1', user: 'Admin User', role: 'administrator', action: 'Login', details: 'Successful login', timestamp: '2026-04-28 09:00:00' },
-  { id: 'LOG-2', user: 'Receptionist Jane', role: 'receptionist', action: 'Create Patient', details: 'Registered new patient John Doe', timestamp: '2026-04-28 09:15:30' },
-  { id: 'LOG-3', user: 'Dr. Smith', role: 'doctor', action: 'Update Diagnosis', details: 'Updated diagnosis for John Doe', timestamp: '2026-04-28 10:20:10' },
-  { id: 'LOG-4', user: 'Nurse Mary', role: 'nurse', action: 'Record Vitals', details: 'Recorded vitals for John Doe', timestamp: '2026-04-28 11:05:45' },
-  { id: 'LOG-5', user: 'Admin User', role: 'administrator', action: 'Export Report', details: 'Exported hospital analytics to PDF', timestamp: '2026-04-28 11:30:00' },
-];
+import * as api from '../../utils/api';
+import { AuditLog } from '../../types';
 
 export default function AdminAuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate fetching
-    setTimeout(() => {
-      setLogs(MOCK_LOGS);
+  const loadData = async () => {
+    try {
+      const data = await api.fetchAuditLogs();
+      setLogs(data);
+    } catch (err) {
+      console.error('Error fetching audit logs:', err);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   if (loading) {
     return <div className="flex justify-center items-center h-full"><p className="text-gray-500">Loading Audit Logs...</p></div>;
   }
 
+  const formatTimestamp = (ts: string) => {
+    const date = new Date(ts);
+    return date.toLocaleString('en-KE', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
   const columns = [
-    { key: 'timestamp', label: 'Timestamp', render: (l: AuditLog) => <span className="text-xs text-gray-500">{l.timestamp}</span> },
-    { key: 'user', label: 'User', render: (l: AuditLog) => <span className="font-medium">{l.user}</span> },
-    { key: 'role', label: 'Role', render: (l: AuditLog) => <span className="capitalize text-xs px-2 py-1 bg-gray-100 rounded text-gray-700">{l.role}</span> },
-    { key: 'action', label: 'Action', render: (l: AuditLog) => <span className="font-semibold text-indigo-700">{l.action}</span> },
-    { key: 'details', label: 'Details' },
+    { 
+      key: 'timestamp', 
+      label: 'Timestamp', 
+      render: (l: AuditLog) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700">{formatTimestamp(l.timestamp)}</span>
+          <span className="text-[10px] text-gray-400 font-mono italic">Ref: #{l.id}</span>
+        </div>
+      ) 
+    },
+    { 
+      key: 'user', 
+      label: 'User', 
+      render: (l: AuditLog) => (
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-[10px]">
+            {l.user.charAt(0).toUpperCase()}
+          </div>
+          <span className="font-medium text-gray-800">{l.user}</span>
+        </div>
+      ) 
+    },
+    { 
+      key: 'role', 
+      label: 'Role', 
+      render: (l: AuditLog) => (
+        <span className="capitalize text-[10px] px-2 py-0.5 bg-gray-100 border border-gray-200 rounded-full text-gray-600 font-medium tracking-wide">
+          {l.role}
+        </span>
+      ) 
+    },
+    { 
+      key: 'action', 
+      label: 'Action', 
+      render: (l: AuditLog) => {
+        const isSecurity = l.action.includes('Login') || l.action.includes('Password');
+        return (
+          <span className={`font-semibold ${isSecurity ? 'text-red-600' : 'text-indigo-700'}`}>
+            {l.action}
+          </span>
+        );
+      } 
+    },
+    { 
+      key: 'details', 
+      label: 'Details',
+      render: (l: AuditLog) => <span className="text-sm text-gray-600 line-clamp-1 hover:line-clamp-none transition-all cursor-default">{l.details}</span>
+    },
   ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800">System Audit Logs</h2>
-        <p className="text-gray-500 mt-1">Monitor all user activities and system events</p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">System Audit Logs</h2>
+          <p className="text-gray-500 mt-1">Monitor all user activities and system events</p>
+        </div>
+        <button 
+          onClick={() => { setLoading(true); loadData(); }}
+          className="text-sm text-indigo-600 font-medium hover:text-indigo-800"
+        >
+          🔄 Refresh Logs
+        </button>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-        <div className="w-12 h-12 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 text-2xl">
+      <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+        <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 text-2xl shadow-inner border border-indigo-100">
           🛡️
         </div>
         <div>
-          <p className="text-sm text-gray-500">Total Security Events</p>
-          <p className="text-2xl font-bold text-gray-800">{logs.length}</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Recorded Events</p>
+          <p className="text-3xl font-black text-gray-800 leading-tight">{logs.length}</p>
         </div>
       </div>
 
