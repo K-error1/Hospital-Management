@@ -131,13 +131,17 @@ from .mpesa import MPesaClient
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    email = request.data.get('email')
+    email = request.data.get('email', '').strip()
     password = request.data.get('password')
     
     if not email or not password:
         return Response({'detail': 'Email and password are required'}, status=400)
     
+    # Try authenticating with both keyword variants to be safe with custom USERNAME_FIELD
     user = authenticate(request, email=email, password=password)
+    if user is None:
+        user = authenticate(request, username=email, password=password)
+        
     if user is not None:
         from django.contrib.auth import login as auth_login
         auth_login(request, user)
@@ -145,7 +149,9 @@ def login_view(request):
         serializer = UserSerializer(user)
         return Response(serializer.data)
     else:
-        log_action(None, f"Failed Login Attempt: {email}")
+        # Check if user exists but password is wrong
+        user_exists = User.objects.filter(email=email).exists()
+        log_action(None, f"Failed Login Attempt: {email}", f"User exists: {user_exists}, Pass length: {len(password)}")
         return Response({'detail': 'Invalid credentials'}, status=401)
 
 @api_view(['POST'])

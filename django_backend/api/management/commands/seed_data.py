@@ -19,8 +19,23 @@ class Command(BaseCommand):
             {'id': 'pat-3', 'name': 'Robert Kipchoge', 'email': 'robert@email.co.ke', 'role': 'patient', 'phone': '+254 720 111 222'},
             {'id': 'recep-1', 'name': 'Alice Wambui', 'email': 'alice@medicare.co.ke', 'role': 'receptionist', 'phone': '+254 700 333 444'},
         ]
+        # Clear existing to avoid conflicts
+        User.objects.all().delete()
+        
         for u in users:
-            User.objects.update_or_create(id=u['id'], defaults=u)
+            # Set username to email if not provided, as AbstractUser requires it
+            if 'username' not in u:
+                u['username'] = u['email']
+                
+            user_obj = User.objects.create(**u)
+            user_obj.set_password('password123')
+            
+            # Grant admin privileges to the administrator role
+            if u['role'] == 'administrator':
+                user_obj.is_staff = True
+                user_obj.is_superuser = True
+                
+            user_obj.save()
 
         # ── Doctors ─────────────────────────────────────────────────────────────
         doctors = [
